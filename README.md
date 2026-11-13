@@ -77,7 +77,7 @@ Settings for `set`: `rate` (`auto`, emails a second, or 0 for no limit), `worker
 
 ## About 5DayDeal.com
 
-[5DayDeal.com](https://5daydeal.com) runs limited-time bundles of courses, presets and tools for photographers, videographers and other creatives, and gives part of every sale to charity. We send a lot of email during each sale, which is why we built this.
+[5DayDeal.com](https://5daydeal.com) runs limited-time bundles of courses, presets and tools for photographers, videographers and other creatives, and gives 10% of every sale to charity. We send a lot of email during each sale, which is why we built this.
 
 This plugin was built by **Griffin Stewart** at 5DayDeal.com. If it helps you, a star on this repo is the best thank you.
 
