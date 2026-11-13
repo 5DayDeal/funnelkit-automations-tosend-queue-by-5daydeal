@@ -1,0 +1,21 @@
+# Cron for the ch-tosend-queue plugin. Replace /path/to/wordpress and /path/to/logs (create the log folder first).
+# Run as the user that owns the WordPress files, on ONE server only. Each line takes its own lock.
+#
+# Site user's crontab (crontab -e as that user). If `wp` starts with `#!/usr/bin/env php`,
+# cron needs a PATH that includes php:
+PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+# Send the queue
+* * * * * flock -n /tmp/chtq-drain.lock wp --skip-packages --path=/path/to/wordpress chtq drain --idle=50 >> /path/to/logs/drain.log 2>&1
+# Pre-building housekeeping
+* * * * * flock -n /tmp/chtq-tick.lock wp --skip-packages --path=/path/to/wordpress chtq tick >> /path/to/logs/tick.log 2>&1
+# Pre-building workers: one line per worker, matching `wp chtq set build_workers <n>` (default 4)
+* * * * * flock -n /tmp/chtq-work-1.lock wp --skip-packages --path=/path/to/wordpress chtq work --idle=50 >> /path/to/logs/work.log 2>&1
+* * * * * flock -n /tmp/chtq-work-2.lock wp --skip-packages --path=/path/to/wordpress chtq work --idle=50 >> /path/to/logs/work.log 2>&1
+* * * * * flock -n /tmp/chtq-work-3.lock wp --skip-packages --path=/path/to/wordpress chtq work --idle=50 >> /path/to/logs/work.log 2>&1
+* * * * * flock -n /tmp/chtq-work-4.lock wp --skip-packages --path=/path/to/wordpress chtq work --idle=50 >> /path/to/logs/work.log 2>&1
+# Daily cleanup of old sent rows, and log rotation
+17 4 * * * flock -n /tmp/chtq-prune.lock wp --skip-packages --path=/path/to/wordpress chtq prune --rotate-logs=/path/to/logs >> /path/to/logs/prune.log 2>&1
+#
+# For /etc/cron.d instead, drop the PATH line if not needed and add the user after the schedule:
+# * * * * * siteuser flock -n /tmp/chtq-drain.lock wp --skip-packages --path=... chtq drain --idle=50 >> ... 2>&1
