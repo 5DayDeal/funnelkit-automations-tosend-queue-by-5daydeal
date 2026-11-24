@@ -3,7 +3,7 @@
  * Plugin Name: FunnelKit Automations toSend Queue Plugin by 5DayDeal.com
  * Plugin URI: https://github.com/5DayDeal/funnelkit-automations-tosend-queue-by-5daydeal
  * Description: Queues FunnelKit Automations broadcast emails and sends them through toSend's batch API at your team's full speed, and can pre-build scheduled broadcasts so they all go out at the scheduled minute. Order emails and automations are untouched.
- * Version: 2.8.0
+ * Version: 2.9.0
  * Requires PHP: 7.4
  * Author: 5DayDeal.com (Griffin Stewart)
  * Author URI: https://5daydeal.com
@@ -20,6 +20,14 @@
  * email sent and moves on in about a millisecond. `wp chtq drain` (run from cron under
  * flock) then sends the queue through toSend's batch API, 100 emails a request, paced to
  * the team's per-second limit, with an Idempotency-Key on every batch.
+ *
+ * CHTQ_Mail_Handler also applies bwfan_before_send_email_body, which FunnelKit stopped
+ * applying to broadcasts in 3.9. Up to 3.8 a broadcast went through the v1 sender, which
+ * applies it; 3.9 moved broadcasts to a controller and mail handler that do not. The
+ * filter still runs on the automation path, so it narrowed rather than disappeared, and
+ * nothing errors when it stops reaching a broadcast. Since this plugin already stands in
+ * that exact spot, it applies the filter itself. Turn that off with
+ * chtq_apply_before_send_email_body if it is ever in the way.
  *
  * FunnelKit runs remove_all_filters('pre_wp_mail') while it prepares each email,
  * so the filter is re-attached from the `wp_mail` filter, which FunnelKit leaves
