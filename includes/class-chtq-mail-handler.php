@@ -14,6 +14,10 @@
  * pre-build run it is held instead, and refused if it cannot be held.
  *
  * Written against FunnelKit Automations Pro 3.9.0.RC2.
+ *
+ * It also applies bwfan_before_send_email_body, which FunnelKit stopped applying to
+ * broadcasts in 3.9. See apply_body_filter() below for why that is this plugin's
+ * problem to solve rather than something to leave alone.
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -27,6 +31,12 @@ class CHTQ_Mail_Handler extends BWFAN_Mail_Handler_Controller {
 		if ( false === $mail_data || ! is_array( $mail_data ) ) {
 			return false;
 		}
+
+		// Before anything branches, so the queue path and the wp_mail fallback below behave
+		// the same way. A reader must never get a different email depending on whether the
+		// queue happened to be on.
+		$mail_data['body'] = $this->apply_body_filter( $mail_data );
+
 		// Inside an early pre-build run (CHTQ_Prebuild_V2) nothing may go out before the
 		// scheduled minute: an email that cannot be held is refused, never sent.
 		$holding = ! empty( CHTQ::$context['hold'] );
@@ -86,6 +96,61 @@ class CHTQ_Mail_Handler extends BWFAN_Mail_Handler_Controller {
 			}
 		}
 		return (bool) $sent;
+	}
+
+	/**
+	 * Run the body through bwfan_before_send_email_body, which 3.9 stopped doing for broadcasts.
+	 *
+	 * Up to FunnelKit Automations 3.8, a broadcast email was sent by the v1 sender in
+	 * class-bwfan-wp-sendemail.php, which applies this filter. 3.9 moved broadcasts to
+	 * BWFCRM_Broadcast_V2_Email_Controller and BWFAN_Mail_Handler_Controller, and neither
+	 * applies it: the controller builds the body and passes it straight on, and the handler
+	 * touches headers only. The filter is still applied on the automation path, so it did not
+	 * disappear, it narrowed. Nothing errors and nothing is logged, so a site that was
+	 * rewriting broadcast bodies through it simply stops, silently.
+	 *
+	 * Reported to FunnelKit in November 2026; the proper fix is one line in their own handler.
+	 * Until that ships, this plugin is already standing in that exact spot on every site that
+	 * uses it, so it applies the filter itself.
+	 *
+	 * The second argument is the per-mail array, which is not the shape the automation path
+	 * passes. That path passes its own data blob, with keys like template, append_utm and
+	 * utm_source. FunnelKit's only listener, BWFAN_UTM_Tracking::maybe_add_utm_parameters(),
+	 * returns the body untouched unless append_utm is 1, which a broadcast's array never has,
+	 * so it is a no-op here rather than a double-application. Broadcast UTM parameters are
+	 * added by the controller through append_to_email_body_links() long before this point.
+	 *
+	 * Guarded, because this sits in the path of every broadcast email:
+	 *   - chtq_apply_before_send_email_body turns it off without an update, for a bad day.
+	 *   - A listener that throws must not take the send with it.
+	 *   - A listener that returns a non-string, or nothing, must not blank the email.
+	 *
+	 * @param array $mail_data
+	 * @return string The body to send.
+	 */
+	private function apply_body_filter( $mail_data ) {
+		$body = isset( $mail_data['body'] ) ? $mail_data['body'] : '';
+
+		if ( ! is_string( $body ) || '' === $body ) {
+			return $body;
+		}
+		if ( ! apply_filters( 'chtq_apply_before_send_email_body', true, $mail_data ) ) {
+			return $body;
+		}
+
+		try {
+			$filtered = apply_filters( 'bwfan_before_send_email_body', $body, $mail_data );
+		} catch ( Error|Exception $e ) {
+			error_log( 'chtq: bwfan_before_send_email_body threw, sending the body unchanged: ' . $e->getMessage() );
+			return $body;
+		}
+
+		if ( ! is_string( $filtered ) || '' === trim( $filtered ) ) {
+			error_log( 'chtq: bwfan_before_send_email_body returned ' . gettype( $filtered ) . ', sending the body unchanged' );
+			return $body;
+		}
+
+		return $filtered;
 	}
 
 	private function broadcast_id( $engagement_id ) {

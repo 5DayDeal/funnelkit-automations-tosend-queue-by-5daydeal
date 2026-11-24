@@ -37,6 +37,8 @@ FunnelKit also prepares a broadcast (works out the audience and creates a record
 
 ## FunnelKit issues we found and reported (Oct 2026)
 
+- **`bwfan_before_send_email_body` stopped reaching broadcasts in 3.9 (found Nov 2026).** Up to Automations 3.8 a broadcast email was sent by the v1 sender in `class-bwfan-wp-sendemail.php`, which applies that filter. 3.9 moved broadcasts to `BWFCRM_Broadcast_V2_Email_Controller` and `BWFAN_Mail_Handler_Controller`: the controller builds the body and passes it straight on, the handler touches headers only, and neither applies the filter. It still runs on the automation path, so it narrowed rather than disappeared. Nothing errors and nothing is logged, so a site rewriting broadcast bodies through it just quietly stops. If you are on 3.9+ and something that used to modify broadcast bodies no longer does, this is why. Since 2.9.0 this plugin applies the filter itself in `CHTQ_Mail_Handler::send_mail()`, before the queue and the `wp_mail` fallback both, so a reader gets the same email either way. Reported to FunnelKit; the proper fix is one line in their handler.
+
 - **Duplicate record codes.** When two broadcasts prepare the same contact in the same second, the second record's code collides and isn't saved, but FunnelKit still counts that contact as done, so they never get the email. Only our test broadcasts hit it, but it can hit two broadcasts scheduled for the same minute. Space them at least a minute apart until FunnelKit fixes it.
 - **Reschedules restart preparation**, even when nothing but the time changed (see point 9).
 
